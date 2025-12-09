@@ -4,6 +4,12 @@
 
 #include <map>
 
+#ifdef PLATFORM_64BITS
+	#define OFFS_M_ATTRIBUTES 0x250
+#else
+	#define OFFS_M_ATTRIBUTES 0x1BC
+#endif
+
 CEconManager g_EconManager;
 
 // pointer to item schema attribute map singleton
@@ -43,7 +49,7 @@ bool CEconManager::Init(char *error, size_t maxlength) {
 	gameconfs->CloseGameConfigFile(conf);
 	
 	// is this late enough in the MM:S load stage?  we might just have to hold the function
-	g_SchemaAttributes = reinterpret_cast<AttributeMap*>(fnGetEconItemSchema() + 0x1BC);
+	g_SchemaAttributes = reinterpret_cast<AttributeMap*>(fnGetEconItemSchema() + OFFS_M_ATTRIBUTES);
 	return true;
 }
 

@@ -16,20 +16,33 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-20.04
+          - ubuntu-22.04
           - windows-latest
+        target_arch:
+          - x86
+          - x86_64
         include:
-          - meta_branch: "1.11-dev"
-            sm_branch: "1.11-dev"
-            spcomp_version: "1.11.x"
+          - meta_branch: "1.12-dev"
+            sm_branch: "1.12-dev"
+            spcomp_version: "1.12.x"
 
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
+            target_arch: x86
             os_short: linux
-            package_ext: tar.gz
+
+          - os: ubuntu-22.04
+            target_arch: x86_64
+            os_short: linux64
 
           - os: windows-latest
+            target_arch: x86
             os_short: win
-            package_ext: zip
+            vs_dev_arch: x86
+
+          - os: windows-latest
+            target_arch: x86_64
+            os_short: win64
+            vs_dev_arch: x64
 
     steps:
       - name: Prepare env
@@ -56,7 +69,7 @@ jobs:
         run: |
           :: See https://github.com/microsoft/vswhere/wiki/Find-VC
           for /f "usebackq delims=*" %%i in (`vswhere -latest -property installationPath`) do (
-            call "%%i"\Common7\Tools\vsdevcmd.bat -arch=x86 -host_arch=x64
+            call "%%i"\Common7\Tools\vsdevcmd.bat -arch=${{ matrix.vs_dev_arch }} -host_arch=x64
           )
           
           :: Loop over all environment variables and make them global.
@@ -66,19 +79,25 @@ jobs:
           
 
       - name: Fetch Metamod:Source ${{ matrix.meta_branch }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: alliedmodders/metamod-source
           ref: ${{ matrix.meta_branch }}
           path: mmsource
 
       - name: Fetch SourceMod ${{ matrix.sm_branch }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: alliedmodders/sourcemod
           ref: ${{ matrix.sm_branch }}
           path: sourcemod
           submodules: recursive
+
+      - name: Fetch SDK manifests
+        uses: actions/checkout@v4
+        with:
+          repository: alliedmodders/hl2sdk-manifests
+          path: hl2sdk-manifests
 
       - name: Fetch SDKs
         shell: bash
@@ -91,13 +110,13 @@ jobs:
           done
 
       - name: Checkout AMBuild
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: alliedmodders/ambuild
           path: ambuild
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
@@ -113,7 +132,7 @@ jobs:
           pip install git+https://github.com/alliedmodders/ambuild
 
       - name: Checkout project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: src
 
@@ -122,8 +141,44 @@ jobs:
         run: |
           mkdir build
           cd build
-          python3 ../configure.py --sdks=present --sm-path="${{ github.workspace }}/sourcemod" --mms-path="${{ github.workspace }}/mmsource" --symbol-files
+          python3 ../configure.py --sm-path="${{ github.workspace }}/sourcemod" --mms-path="${{ github.workspace }}/mmsource" --hl2sdk-manifest-path="${{ github.workspace }}/hl2sdk-manifests" --symbol-files --enable-optimize --targets ${{ matrix.target_arch }}
           ambuild
+
+      - name: Upload Build Artifact
+        id: upload-build-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os_short }}-${{ matrix.target_arch }}
+          path: src/build/package
+
+  combine_packages:
+    name: Upload assets for for ${{ matrix.os_short }}
+    needs: [build]
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - windows-latest
+        include:
+          - os: ubuntu-22.04
+            os_short: linux
+            package_ext: .tar.gz
+
+          - os: windows-latest
+            os_short: win
+            package_ext: zip
+
+    steps:
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: src/build/package
+          pattern: ${{ matrix.os_short }}*
+          merge-multiple: true
+
 
       - name: Build Package (Windows)
         if: runner.os == 'Windows'

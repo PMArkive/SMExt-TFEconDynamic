@@ -101,7 +101,11 @@ class CEconManager {
 
 // binary refers to 0x58 when iterating over the attribute map, so we'll refer to that value
 // we could also do a runtime assertion
+#ifdef PLATFORM_64BITS
+static_assert(sizeof(CEconItemAttributeDefinition) + 0x18 == 0x80, "CEconItemAttributeDefinition size mismatch");
+#else
 static_assert(sizeof(CEconItemAttributeDefinition) + 0x14 == 0x58, "CEconItemAttributeDefinition size mismatch");
+#endif
 
 extern CEconManager g_EconManager;
 

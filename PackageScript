@@ -9,9 +9,19 @@ builder.SetBuildFolder('package')
 folder_list = [
   'addons/sourcemod/extensions',
   'addons/sourcemod/gamedata',
-  'addons/sourcemod/plugins',
+  'addons/sourcemod/scripting',
   'addons/sourcemod/scripting/include',
 ]
+
+if 'x86_64' in Extension.target_archs:
+  folder_list.extend([
+    'addons/sourcemod/extensions/x64',
+  ])
+
+if Extension.plugins:
+  folder_list += [
+    'addons/sourcemod/plugins',
+  ]
 
 # Create the distribution folder hierarchy.
 folder_map = {}
@@ -32,13 +42,20 @@ CopyFiles('gamedata', 'addons/sourcemod/gamedata', [
   'tf2.econ_dynamic.txt',
 ])
 
+CopyFiles('scripting', 'addons/sourcemod/scripting', [
+  'tf_econ_dynamic_compat.sp',
+])
+
 CopyFiles('scripting/include', 'addons/sourcemod/scripting/include', [
   'tf_econ_dynamic.inc',
 ])
 
 # Copy binaries.
 for cxx_task in Extension.extensions:
-  builder.AddCopy(cxx_task.binary, folder_map['addons/sourcemod/extensions'])
+  if cxx_task.target.arch == 'x86_64':
+    builder.AddCopy(cxx_task.binary, folder_map['addons/sourcemod/extensions/x64'])
+  else:
+    builder.AddCopy(cxx_task.binary, folder_map['addons/sourcemod/extensions'])
 
 # Copy plugins
 for smx_file, smx_entry in Extension.plugins.items():
